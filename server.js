@@ -1,5 +1,6 @@
 import express, { urlencoded } from 'express';
 import bcrypt from 'bcrypt';
+import cors from 'cors';
 
 const PORT = 8080
 
@@ -43,6 +44,7 @@ const app = express();
 
 // app.use(urlencoded({extends: false}));
 app.use(express.json())
+app.use(cors())
 
 
 const addUser = async (name, email, password) => {

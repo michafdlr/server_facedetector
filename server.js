@@ -80,16 +80,16 @@ app.post("/signin", (req, res) => {
     checkUserPassword(req.body.password, database.users[0].password)
     // req.body.password === database.users[0].password
   ) {
-    res.send(`successfull login for ${req.body.email} with hash ${database.users[0].password}`)
+    res.status(200).send(`successfull login for ${req.body.email} with hash ${database.users[0].password}`)
   } else{
-    res.send(`wrong password or no user with email ${req.body.email} registered`)
+    res.status(400).send(`wrong password or no user with email ${req.body.email} registered`)
   }
 })
 
 app.post("/register", (req, res) => {
   const {name, email, password} = req.body
   addUser(name, email, password)
-  res.send(database.users[database.users.length-1])
+  res.status(200).send(database.users[database.users.length-1])
 })
 
 app.get("/profile/:id", (req, res) => {

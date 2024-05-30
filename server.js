@@ -37,8 +37,8 @@ const database = {
   ]
 }
 
-const checkUserPassword = (enteredPassword, storedPasswordHash) =>
-  bcrypt.compare(enteredPassword, storedPasswordHash)
+const checkUserPassword = async (enteredPassword, storedPasswordHash) =>
+  await bcrypt.compare(enteredPassword, storedPasswordHash)
 
 const app = express();
 
@@ -75,21 +75,21 @@ const getUser = (id) => {
 
 app.get("/", (req, res) => res.send(database.users));
 
-app.post("/signin", (req, res) => {
+app.post("/signin", async (req, res) => {
   if (req.body.email === database.users[0].email &&
-    checkUserPassword(req.body.password, database.users[0].password)
+    await checkUserPassword(req.body.password, database.users[0].password)
     // req.body.password === database.users[0].password
   ) {
-    res.status(200).send(`successfull login for ${req.body.email} with hash ${database.users[0].password}`)
+    res.status(200).send(database.users[0])
   } else{
-    res.status(400).send(`wrong password or no user with email ${req.body.email} registered`)
+    res.status(400).send({answer: 'invalid'})
   }
 })
 
-app.post("/register", (req, res) => {
+app.post("/register", async (req, res) => {
   const {name, email, password} = req.body
-  addUser(name, email, password)
-  res.status(200).send(database.users[database.users.length-1])
+  await addUser(name, email, password)
+  res.send(database.users[database.users.length-1])
 })
 
 app.get("/profile/:id", (req, res) => {

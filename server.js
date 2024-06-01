@@ -62,6 +62,12 @@ app.use(cors())
 const addUser = async (name, email, password, res) => {
   const hash = await storeUserPassword(password, saltRounds)
 
+  await db('login')
+    .insert({
+      hash: hash,
+      email: email
+    })
+
   db('users')
     .returning('*')
     .insert({
@@ -73,26 +79,20 @@ const addUser = async (name, email, password, res) => {
       res.json(user[0])
     })
     .catch(err => res.status(400).json("unable to register"))
-  // db('login').insert({
-  //   hash: hash,
-  //   email: email
-  // })
-  //   .then(console.log)
 }
 
-const getUser = (id) => {
-  let search = ''
-  database.users.forEach(user => {
-    if (user.id === id) {
-      search = user
-      return
-    }
-  })
-  return search
+const getUser = async (id) => {
+  const counter = await db('users').returning('counter').select('counter').where({id})
+    .then(response => Number(response[0].counter))
+  return counter
 }
 
 
-app.get("/", (req, res) => res.send(database.users));
+app.get("/", (req, res) => {
+  db('users').select().returning('*')
+    .then(response => res.json(response))
+    .catch(err => res.status(400).json('Problem fetching users'))
+});
 
 app.post("/signin", async (req, res) => {
   if (req.body.email === database.users[0].email &&
@@ -113,23 +113,23 @@ app.post("/register", async (req, res) => {
 
 app.get("/profile/:id", (req, res) => {
   const {id} = req.params
-  const user = getUser(id)
-  if (user != "") {
-    res.send(user)
-  } else {
-    res.status(400).send("not found")
-  }
+  db.select().from("users").where({id})
+    .then(user => {
+      if (user.length) {
+        res.json(user[0])
+      } else {
+        res.status(400).json("not found")
+      }
+    })
+    .catch(err => res.status(400).json('error getting user'));
 })
 
 app.put("/image", (req, res) => {
   const {id} = req.body
-  const user = getUser(id)
-  if (user != "") {
-    user.counter++
-    res.json(user.counter)
-  } else {
-    res.status(400).send("user not found")
-  }
+  db('users').where('id', '=', id).increment('counter', 1)
+    .returning('counter')
+    .then(counter => res.json(counter[0].counter))
+    .catch(err => res.status(400).json('could not get user'))
 })
 
 app.listen(PORT, () => `App running on port ${PORT}`)

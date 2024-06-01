@@ -61,31 +61,55 @@ app.use(cors())
 
 const addUser = async (name, email, password, res) => {
   const hash = await storeUserPassword(password, saltRounds)
-
-  await db('login')
-    .insert({
+  await db.transaction(trx => {
+    trx.insert({
       hash: hash,
       email: email
     })
+      .into('login')
+      .returning('email')
+      .then(loginEmail => {
+        trx('users')
+          .returning('*')
+          .insert({
+            name: name,
+            email: loginEmail[0].email,
+            joined: new Date()
+          })
+          .then(user => {
+            res.json(user[0])
+          })
+      })
+      .then(trx.commit)
+      .catch(trx.rollback)
+  })
+  .catch(err => res.status(400).json("unable to register"))
 
-  db('users')
-    .returning('*')
-    .insert({
-      name: name,
-      email: email,
-      joined: new Date()
-    })
-    .then(user => {
-      res.json(user[0])
-    })
-    .catch(err => res.status(400).json("unable to register"))
+
+  // await db('login')
+  //   .insert({
+  //     hash: hash,
+  //     email: email
+  //   })
+
+  // db('users')
+  //   .returning('*')
+  //   .insert({
+  //     name: name,
+  //     email: email,
+  //     joined: new Date()
+  //   })
+  //   .then(user => {
+  //     res.json(user[0])
+  //   })
+  //   .catch(err => res.status(400).json("unable to register"))
 }
 
-const getUser = async (id) => {
-  const counter = await db('users').returning('counter').select('counter').where({id})
-    .then(response => Number(response[0].counter))
-  return counter
-}
+// const getUser = async (id) => {
+//   const counter = await db('users').returning('counter').select('counter').where({id})
+//     .then(response => Number(response[0].counter))
+//   return counter
+// }
 
 
 app.get("/", (req, res) => {
@@ -95,14 +119,20 @@ app.get("/", (req, res) => {
 });
 
 app.post("/signin", async (req, res) => {
-  if (req.body.email === database.users[0].email &&
-    await checkUserPassword(req.body.password, database.users[0].password)
-    // req.body.password === database.users[0].password
-  ) {
-    res.status(200).send(database.users[0])
-  } else{
-    res.status(400).send({answer: 'invalid'})
-  }
+  db('login').select('hash', 'email').where("email", "=", req.body.email)
+    .then(async response => {
+      const isValid = await checkUserPassword(req.body.password, response[0].hash)
+      if (isValid) {
+        return db('users').select().where("email", "=", req.body.email)
+                .then(user => {
+                  res.json(user[0])
+                })
+                .catch(err => res.status(500).json('unable to get user'))
+      } else {
+        res.status(401).json("unauthorized")
+      }
+    })
+    .catch(err => res.status(401).json("no user with given email found"))
 })
 
 app.post("/register", async (req, res) => {

@@ -1,6 +1,18 @@
 import express, { urlencoded } from 'express';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
+import knex from 'knex';
+
+const db = knex({
+  client: 'pg',
+  connection: {
+    host: '127.0.0.1',
+    port: 5432,
+    user: 'michaelfiedler',
+    password: '',
+    database: 'facedetector',
+  },
+});
 
 const PORT = 8080
 
@@ -47,18 +59,25 @@ app.use(express.json())
 app.use(cors())
 
 
-const addUser = async (name, email, password) => {
-  const id = database.users.length + 1
+const addUser = async (name, email, password, res) => {
   const hash = await storeUserPassword(password, saltRounds)
-  const newUser = {
-    "id": String(id),
-    "name": name,
-    "email": email,
-    "password": hash,
-    "counter": 0,
-    "joined": new Date()
-  }
-  database.users.push(newUser)
+
+  db('users')
+    .returning('*')
+    .insert({
+      name: name,
+      email: email,
+      joined: new Date()
+    })
+    .then(user => {
+      res.json(user[0])
+    })
+    .catch(err => res.status(400).json("unable to register"))
+  // db('login').insert({
+  //   hash: hash,
+  //   email: email
+  // })
+  //   .then(console.log)
 }
 
 const getUser = (id) => {
@@ -88,8 +107,8 @@ app.post("/signin", async (req, res) => {
 
 app.post("/register", async (req, res) => {
   const {name, email, password} = req.body
-  await addUser(name, email, password)
-  res.send(database.users[database.users.length-1])
+  await addUser(name, email, password, res)
+  // res.send("user added")
 })
 
 app.get("/profile/:id", (req, res) => {

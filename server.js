@@ -1,7 +1,10 @@
-import express, { urlencoded } from 'express';
+import express from 'express';
 import bcrypt from 'bcrypt';
 import cors from 'cors';
 import knex from 'knex';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const db = knex({
   client: 'pg',
@@ -22,8 +25,7 @@ const storeUserPassword = (password, salt) =>
   bcrypt.hash(password, salt).then(storeHashInDatabase)
 
 const storeHashInDatabase = (hash) => {
-  // Store the hash in your password DB
-  return hash // For now we are returning the hash for testing at the bottom
+  return hash
 }
 
 const checkUserPassword = async (enteredPassword, storedPasswordHash) =>
@@ -31,7 +33,6 @@ const checkUserPassword = async (enteredPassword, storedPasswordHash) =>
 
 const app = express();
 
-// app.use(urlencoded({extends: false}));
 app.use(express.json())
 app.use(cors())
 
@@ -63,12 +64,6 @@ const addUser = async (name, email, password, res) => {
   .catch(err => res.status(400).json("unable to register"))
 }
 
-// const getUser = async (id) => {
-//   const counter = await db('users').returning('counter').select('counter').where({id})
-//     .then(response => Number(response[0].counter))
-//   return counter
-// }
-
 
 app.get("/", (req, res) => {
   db('users').select().returning('*')
@@ -96,7 +91,6 @@ app.post("/signin", async (req, res) => {
 app.post("/register", async (req, res) => {
   const {name, email, password} = req.body
   await addUser(name, email, password, res)
-  // res.send("user added")
 })
 
 app.get("/profile/:id", (req, res) => {
@@ -136,4 +130,42 @@ app.put("/reset", async (req, res) => {
     })
 })
 
-app.listen(PORT, () => `App running on port ${PORT}`)
+app.post('/api/proxy', async (req, res) => {
+  const { url, data } = req.body;
+
+  // Log the incoming request body to debug
+  // console.log('Received request:', req.body);
+
+  if (!url || !data) {
+    res.status(400).json({ error: 'Bad Request: URL or data is missing' });
+    return;
+  }
+
+  const requestOptions = {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Key ${process.env.API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: data
+  };
+
+
+  try {
+    const response = await fetch(url, requestOptions);
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('Error with the request:', result);
+      res.status(response.status).json(result);
+    } else {
+      res.status(response.status).json(result);
+    }
+  } catch (error) {
+    console.error('Internal Server Error:', error);
+    res.status(500).json({ error: 'Internal Server Error', details: error.message });
+  }
+});
+
+app.listen(PORT, () => {console.log(`Server running on port ${PORT}`)})
